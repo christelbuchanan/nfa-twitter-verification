@@ -51,12 +51,12 @@ A trust bridge system that verifies Twitter social actions off-chain and attests
 
 ```mermaid
 flowchart LR
-    A[User Tweets<br/>e.g. "I just minted my first agent<br/>#ProofOfPrompt #NFA88 0xAB12..."] --> B[Backend Detection<br/>(Twitter API / Hashtag Crawler)]
-    B --> C[Boolean API Verification<br/>Checks tweet + wallet match<br/>Generates proofHash = SHA256(tweet_id + wallet)]
-    C --> D[AttestationRegistry<br/>on BNB Chain<br/>Stores (wallet, taskId, tweetId, proofHash)]
-    D --> E[NFARewardDistributor<br/>Triggers reward mint or token drop]
-    D --> F[ChatAndBuild Dashboard<br/>Reads verified TaskCompleted event<br/>via Boolean or BNB event logs]
-    E --> G[User Dashboard<br/>Shows ✅ "Twitter Share Completed"]
+    A["User Tweets with hashtags and wallet address"] --> B["Backend Detection via Twitter API or Hashtag Crawler"]
+    B --> C["Boolean API Verification generates proofHash"]
+    C --> D["AttestationRegistry stores on BNB Chain"]
+    D --> E["NFARewardDistributor triggers reward"]
+    D --> F["ChatAndBuild Dashboard reads verified event"]
+    E --> G["User Dashboard shows completion status"]
 ```
 
 ### Flow Breakdown

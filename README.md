@@ -2,61 +2,197 @@
 
 A trust bridge system that verifies Twitter social actions off-chain and attests them on-chain for ChatAndBuild to read via Boolean API or BNB Chain events.
 
-## 🏗️ Architecture Overview
 
-```
-┌─────────────────┐
-│   User Wallet   │ (BNB Chain Wallet)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────┐
-│              NFA Verification Bridge                │
-│  ┌──────────────────────────────────────────────┐  │
-│  │  Step 1: Wallet Binding                      │  │
-│  │  - Connect BNB Chain Wallet                  │  │
-│  │  - No seed phrase required                   │  │
-│  └──────────────────────────────────────────────┘  │
-│                                                     │
-│  ┌──────────────────────────────────────────────┐  │
-│  │  Step 2: Off-Chain Twitter Verification      │  │
-│  │  Option A: Twitter OAuth API                 │  │
-│  │  Option B: Hashtag Crawler (1-3 min delay)   │  │
-│  └──────────────────────────────────────────────┘  │
-│                                                     │
-│  ┌──────────────────────────────────────────────┐  │
-│  │  Step 3: Boolean API Attestation             │  │
-│  │  - Generate proof hash                       │  │
-│  │  - Submit to AttestationRegistry             │  │
-│  │  - Store on BNB Chain                        │  │
-│  └──────────────────────────────────────────────┘  │
-│                                                     │
-│  ┌──────────────────────────────────────────────┐  │
-│  │  Step 4: Feedback to ChatAndBuild            │  │
-│  │  - Boolean API query                         │  │
-│  │  - BNB Chain event listener                  │  │
-│  │  - NFARewardDistributor triggers             │  │
-│  └──────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────┐
-│  BNB Chain      │
-│  - Attestations │
-│  - Rewards      │
-└─────────────────┘
+## 🏗️ System Architecture
+
+```mermaid
+graph TB
+    subgraph User Layer
+        U[User Wallet]
+        T[Twitter Account]
+    end
+    
+    subgraph Verification Bridge
+        W[Wallet Connect]
+        TV[Twitter Verifier]
+        BA[Boolean API]
+    end
+    
+    subgraph BNB Chain
+        AR[AttestationRegistry]
+        RD[NFARewardDistributor]
+    end
+    
+    subgraph ChatAndBuild
+        DB[Dashboard]
+        API[API Reader]
+        EL[Event Listener]
+    end
+    
+    U --> W
+    T --> TV
+    W --> BA
+    TV --> BA
+    BA --> AR
+    AR --> RD
+    AR --> EL
+    AR --> API
+    RD --> DB
+    EL --> DB
+    API --> DB
+    DB --> U
 ```
 
 ## 🔄 Verification Flow
 
 ```mermaid
+sequenceDiagram
+    participant User
+    participant Twitter
+    participant Backend
+    participant BooleanAPI
+    participant BNBChain
+    participant ChatAndBuild
+    
+    User->>Twitter: Post tweet with hashtags and wallet
+    Twitter->>Backend: Detect tweet via API/Crawler
+    Backend->>BooleanAPI: Request verification
+    BooleanAPI->>BooleanAPI: Generate proofHash
+    BooleanAPI->>BNBChain: Submit attestation
+    BNBChain->>BNBChain: Store in AttestationRegistry
+    BNBChain->>BNBChain: Trigger NFARewardDistributor
+    BNBChain-->>ChatAndBuild: Emit AttestationCreated event
+    ChatAndBuild->>ChatAndBuild: Update dashboard
+    ChatAndBuild-->>User: Show completion status
+    BNBChain-->>User: Distribute reward
+```
+
+## 📊 Data Flow
+
+```mermaid
 flowchart LR
-    A["User Tweets with hashtags and wallet address"] --> B["Backend Detection via Twitter API or Hashtag Crawler"]
-    B --> C["Boolean API Verification generates proofHash"]
-    C --> D["AttestationRegistry stores on BNB Chain"]
-    D --> E["NFARewardDistributor triggers reward"]
-    D --> F["ChatAndBuild Dashboard reads verified event"]
-    E --> G["User Dashboard shows completion status"]
+    A[User Tweets] --> B[Backend Detection]
+    B --> C{Verification Method}
+    C -->|OAuth| D[Twitter API]
+    C -->|Crawler| E[Hashtag Scanner]
+    D --> F[Boolean API]
+    E --> F
+    F --> G[Generate ProofHash]
+    G --> H[AttestationRegistry]
+    H --> I[Store on BNB Chain]
+    I --> J[Emit Event]
+    J --> K[ChatAndBuild Dashboard]
+    J --> L[NFARewardDistributor]
+    L --> M[User Reward]
+```
+
+## 🔐 Attestation Process
+
+```mermaid
+stateDiagram-v2
+    [*] --> WalletConnected: Connect Wallet
+    WalletConnected --> TweetPosted: Post Tweet
+    TweetPosted --> Detecting: Backend Scanning
+    Detecting --> Verifying: Tweet Found
+    Verifying --> Generating: Validation Success
+    Generating --> Submitting: ProofHash Created
+    Submitting --> OnChain: Transaction Sent
+    OnChain --> Completed: Attestation Stored
+    Completed --> Rewarded: Reward Distributed
+    Rewarded --> [*]
+    
+    Detecting --> Failed: Tweet Not Found
+    Verifying --> Failed: Validation Failed
+    Submitting --> Failed: Transaction Failed
+    Failed --> [*]
+```
+
+## 🎯 Component Interaction
+
+```mermaid
+graph LR
+    subgraph Frontend
+        WC[WalletConnect]
+        TV[TwitterVerify]
+        AL[AttestationList]
+        SC[StatsCards]
+    end
+    
+    subgraph Hooks
+        TA[useTwitterAuth]
+        BA[useBooleanAPI]
+        AT[useAttestation]
+    end
+    
+    subgraph Utils
+        TU[twitter.ts]
+        AU[attestation.ts]
+        BU[blockchain.ts]
+    end
+    
+    WC --> AT
+    TV --> TA
+    TV --> BA
+    AL --> AT
+    SC --> AT
+    
+    TA --> TU
+    BA --> AU
+    AT --> BU
+```
+
+## 🔄 Smart Contract Flow
+
+```mermaid
+flowchart TD
+    A[User Action] --> B{Wallet Connected?}
+    B -->|No| C[Connect Wallet]
+    B -->|Yes| D[Post Tweet]
+    C --> D
+    D --> E[Backend Verifies]
+    E --> F{Valid Tweet?}
+    F -->|No| G[Show Error]
+    F -->|Yes| H[Call AttestationRegistry]
+    H --> I[Store Attestation]
+    I --> J[Emit Event]
+    J --> K[Trigger NFARewardDistributor]
+    K --> L[Mint/Transfer Reward]
+    L --> M[Update User Balance]
+    M --> N[Show Success]
+```
+
+## 📈 Monitoring Dashboard Flow
+
+```mermaid
+graph TB
+    subgraph Data Sources
+        BC[BNB Chain Events]
+        BA[Boolean API]
+        TA[Twitter API]
+    end
+    
+    subgraph Processing
+        EL[Event Listener]
+        AP[API Poller]
+        DT[Data Transformer]
+    end
+    
+    subgraph Dashboard
+        TV[Total Verifications]
+        AU[Active Users]
+        SR[Success Rate]
+        HS[Health Status]
+    end
+    
+    BC --> EL
+    BA --> AP
+    TA --> AP
+    EL --> DT
+    AP --> DT
+    DT --> TV
+    DT --> AU
+    DT --> SR
+    DT --> HS
 ```
 
 ### Flow Breakdown
